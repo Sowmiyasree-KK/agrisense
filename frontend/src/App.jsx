@@ -9,6 +9,7 @@ import Loading from "./components/Loading";
 import ErrorBanner from "./components/Error";
 import CropHealth from "./components/CropHealth";
 import AIRecommendations from "./pages/AIRecommendations";
+import ChemicalStressCard from "./components/ChemicalStressCard";
 
 const TABS = [
   { id: "dashboard", label: "Dashboard",        icon: "🌿" },
@@ -119,8 +120,8 @@ function Dashboard() {
         </div>
       )}
 
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+      {/* ── Stat Cards — 2 cols on tablet, 4 cols on desktop ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <div className="slide-up">
           <StatCard icon="🌡️" label="Temperature" value={data?.temp}     unit="°C" color="emerald" />
         </div>
@@ -129,6 +130,13 @@ function Dashboard() {
         </div>
         <div className="slide-up">
           <StatCard icon="🧪" label="pH Level"    value={data?.ph}       unit=""   color="purple"  />
+        </div>
+        <div className="slide-up">
+          <ChemicalStressCard
+            moisture={data?.moisture}
+            ph={data?.ph}
+            status={data?.status}
+          />
         </div>
       </div>
 
