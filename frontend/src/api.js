@@ -1,44 +1,40 @@
 import axios from "axios";
 
 /**
- * WHY WE USE LOCAL IP INSTEAD OF LOCALHOST
- * -----------------------------------------
- * "localhost" always refers to the machine running the code.
+ * HOW THE BACKEND URL WORKS
+ * ─────────────────────────────────────────────────────────────────────────
+ * We use an environment variable (VITE_API_URL) so the same codebase works
+ * in every environment without any code changes:
  *
- * When the React dev server (Vite) runs in your browser, "localhost"
- * points to YOUR BROWSER'S machine — not the Flask server.
+ *  • Local dev  → set VITE_API_URL in .env.local (e.g. http://localhost:5000)
+ *  • Vercel     → set VITE_API_URL in the Vercel dashboard → Project Settings
+ *                 → Environment Variables
+ *  • No variable set → falls back to the deployed Render backend automatically
  *
- * If Flask is running on a different machine, or even just a different
- * process that isn't proxied, the browser cannot reach "localhost:5000".
+ * WHY NOT HARDCODE THE URL?
+ * Hardcoding means you must edit source code every time the backend moves.
+ * An env variable lets you change the target with zero code changes.
  *
- * Using the actual LAN IP (e.g. 172.19.3.181) tells the browser exactly
- * which machine on the network to talk to — so it always works whether
- * you're on the same PC or accessing from another device on the same WiFi.
- *
- * ✅ TO UPDATE: Run `ipconfig` in PowerShell and look for "IPv4 Address"
- *    under your active WiFi or Ethernet adapter, then change LOCAL_IP below.
+ * Vite exposes env variables that start with VITE_ to the browser bundle.
+ * Access them via: import.meta.env.VITE_API_URL
  */
 
-// ─── Single source of truth for the backend address ───────────────────────
-const LOCAL_IP = "172.19.3.181"; // ← your machine's LAN IP
-const PORT     = 5000;
-
-export const BASE_URL = `http://${LOCAL_IP}:${PORT}`;
-// ──────────────────────────────────────────────────────────────────────────
+// ── Single source of truth for the backend address ────────────────────────
+export const BASE_URL =
+  import.meta.env.VITE_API_URL || "https://agrisense-hsc5.onrender.com";
+// ─────────────────────────────────────────────────────────────────────────
 
 // Axios instance — all API calls go through this one object.
-// Changing BASE_URL above is the only thing you ever need to touch.
+// Timeout is generous (12 s) because Render free tier cold-starts can be slow.
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 8000, // fail fast if Flask is unreachable (8 seconds)
-  headers: {
-    "Content-Type": "application/json",
-  },
+  timeout: 12000,
+  headers: { "Content-Type": "application/json" },
 });
 
 /**
- * Fetch one soil reading from Flask.
- * Throws a descriptive error so the UI can show a helpful message.
+ * Fetch one soil reading from the Flask /data endpoint.
+ * Returns the full payload: temp, moisture, ph, status, crops, advice, risk, hash …
  */
 export async function fetchSoilData() {
   try {
@@ -47,18 +43,18 @@ export async function fetchSoilData() {
   } catch (err) {
     if (!err.response) {
       throw new Error(
-        `Cannot reach Flask at ${BASE_URL}. ` +
-        `Make sure the backend is running and your IP is correct.`
+        `Cannot reach backend at ${BASE_URL}. ` +
+        `Check your internet connection or VITE_API_URL setting.`
       );
     }
-    const serverMsg = err.response?.data?.error || err.response?.statusText;
-    throw new Error(`Server error ${err.response.status}: ${serverMsg}`);
+    const msg = err.response?.data?.error || err.response?.statusText;
+    throw new Error(`Server error ${err.response.status}: ${msg}`);
   }
 }
 
 /**
- * Upload a crop image for health prediction.
- * @param {File} imageFile — the File object from an <input type="file">
+ * Upload a crop image to /predict for health analysis.
+ * @param {File} imageFile — File object from <input type="file">
  * @returns {Promise<{prediction, confidence, reason, suggestion}>}
  */
 export async function predictCrop(imageFile) {
@@ -66,20 +62,20 @@ export async function predictCrop(imageFile) {
     const formData = new FormData();
     formData.append("image", imageFile);
 
-    // Note: do NOT set Content-Type header manually for FormData —
-    // the browser sets it automatically with the correct boundary.
+    // Do NOT set Content-Type manually for FormData —
+    // the browser adds the correct multipart boundary automatically.
     const response = await axios.post(`${BASE_URL}/predict`, formData, {
-      timeout: 15000,
+      timeout: 20000, // image upload + inference can take a few seconds
     });
     return response.data;
   } catch (err) {
     if (!err.response) {
       throw new Error(
-        `Cannot reach Flask at ${BASE_URL}. ` +
-        `Make sure the backend is running.`
+        `Cannot reach backend at ${BASE_URL}. ` +
+        `Check your internet connection or VITE_API_URL setting.`
       );
     }
-    const serverMsg = err.response?.data?.error || err.response?.statusText;
-    throw new Error(`Prediction failed: ${serverMsg}`);
+    const msg = err.response?.data?.error || err.response?.statusText;
+    throw new Error(`Prediction failed: ${msg}`);
   }
 }
